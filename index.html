@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘도 공부 완료!</title>
+    <title>로그인 - 오늘도 공부 완료!</title>
     <link rel="stylesheet" href="index.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,8 +18,37 @@
 <link rel="stylesheet" href="/index.css">
 </head>
 <body>
-    <div id="root"></div>
-    <script type="module" src="index.js"></script>
+    <div id="root">
+        <div class="login-container">
+            <div class="card login-card">
+                <header class="header">
+                    <h1>나의 공부 플래너</h1>
+                    <p>정보를 입력하여 시작하세요</p>
+                </header>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="name">이름</label>
+                        <input type="text" id="name" class="subject-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">비밀번호</label>
+                        <input type="password" id="password" class="subject-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-key">Gemini API 키</label>
+                        <input type="password" id="api-key" class="subject-input" required>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="auto-login">
+                        <label for="auto-login">자동 로그인</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">시작하기</button>
+                    <p id="error-message" class="error-text"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="login.js"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
