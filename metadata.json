@@ -1,0 +1,7 @@
+{
+  "name": "Study Tracker App",
+  "description": "An app to track study time, earn points, and get AI motivation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
