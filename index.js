@@ -1,7 +1,7 @@
-
-import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 // --- AUTHENTICATION & DATA SETUP ---
+// The API key is now handled by the environment, simplifying the user experience.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- ICONS & ILLUSTRATIONS (SVG) ---
@@ -25,48 +25,25 @@ const icons = {
 
 
 // --- STATE MANAGEMENT ---
-interface Subject {
-  id: number;
-  name: string;
-  status: 'pending' | 'finished' | 'completed';
-  elapsedTime: number; // in seconds
-}
-
-interface StudyRecord {
-  id: number;
-  subjectName: string;
-  timeString: string;
-  imageSrc: string;
-  points: number;
-}
-
-interface FinishedSubjectInfo {
-    id: number;
-    name: string;
-    timeString: string;
-}
-
 const initialState = {
   // App state
-  currentPage: 'login' as 'login' | 'main' | 'timer',
-  userName: '',
-  loginError: '',
+  currentPage: 'main',
   
   // Planner Core state
-  subjects: [] as Subject[],
+  subjects: [],
   totalPoints: 0,
   newSubject: '',
   nextId: 1,
   nextRecordId: 1,
-  studyRecords: [] as StudyRecord[],
+  studyRecords: [],
   
   // Page and timer state
-  studyingSubjectId: null as number | null,
-  activeTimerId: null as NodeJS.Timeout | null,
+  studyingSubjectId: null,
+  activeTimerId: null,
   
   // Chat state
-  chat: null as Chat | null,
-  chatHistory: [] as { role: 'user' | 'model', text: string }[],
+  chat: null,
+  chatHistory: [],
   chatInput: '',
   isAnswering: false,
 
@@ -74,13 +51,13 @@ const initialState = {
   isLoading: false,
   motivationalMessage: '',
   showFinishModal: false,
-  finishedSubjectInfo: null as FinishedSubjectInfo | null,
+  finishedSubjectInfo: null,
 };
 
 let state = { ...initialState };
 
 // --- UTILITY FUNCTIONS ---
-const formatTime = (totalSeconds: number): string => {
+const formatTime = (totalSeconds) => {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -90,7 +67,7 @@ const formatTime = (totalSeconds: number): string => {
 };
 
 // --- API FUNCTIONS ---
-async function getMotivationMessage(subjectName: string, timeString: string) {
+async function getMotivationMessage(subjectName, timeString) {
   try {
     setState({ isLoading: true, motivationalMessage: '' });
     const prompt = `A student just studied '${subjectName}' for ${timeString}. Write a short, creative, and encouraging message for them in Korean. Be cheerful and inspiring.`;
@@ -109,48 +86,12 @@ async function getMotivationMessage(subjectName: string, timeString: string) {
 
 
 // --- DOM MANIPULATION & EVENT HANDLERS ---
-const setState = (newState: Partial<typeof state>) => {
+const setState = (newState) => {
   state = { ...state, ...newState };
   render();
 };
 
-const handleLogin = (e: Event) => {
-    e.preventDefault();
-    const nameInput = document.getElementById('name') as HTMLInputElement;
-    const name = nameInput.value.trim();
-
-    if (!name) {
-        setState({ loginError: '이름을 입력해주세요.' });
-        return;
-    }
-
-    try {
-        localStorage.setItem('studyPlannerUser', JSON.stringify({ name }));
-        const savedData = localStorage.getItem(`plannerData_${name}`);
-        
-        if (savedData) {
-            const parsedData = JSON.parse(savedData);
-            setState({
-                ...state,
-                ...parsedData,
-                currentPage: 'main',
-                userName: name,
-                loginError: '',
-            });
-        } else {
-             setState({
-                ...initialState,
-                currentPage: 'main',
-                userName: name,
-             });
-        }
-    } catch (err) {
-        console.error("Login failed:", err);
-        setState({ loginError: '로그인에 실패했습니다. 브라우저 설정을 확인해주세요.' });
-    }
-};
-
-const handleLogout = () => {
+const saveData = () => {
     try {
         const plannerData = {
             subjects: state.subjects,
@@ -159,19 +100,23 @@ const handleLogout = () => {
             nextId: state.nextId,
             nextRecordId: state.nextRecordId,
         };
-        localStorage.setItem(`plannerData_${state.userName}`, JSON.stringify(plannerData));
+        localStorage.setItem('plannerData', JSON.stringify(plannerData));
     } catch(e) {
         console.error("Could not save planner data", e);
     }
-    
-    localStorage.removeItem('studyPlannerUser');
-    setState({ ...initialState });
 };
 
-const handleAddSubject = (e: Event) => {
+const handleReset = () => {
+    if(confirm('정말로 모든 공부 기록을 초기화하시겠어요? 이 작업은 되돌릴 수 없습니다.')) {
+        localStorage.removeItem('plannerData');
+        setState({ ...initialState });
+    }
+};
+
+const handleAddSubject = (e) => {
   e.preventDefault();
   if (state.newSubject.trim()) {
-    const newSubject: Subject = {
+    const newSubject = {
       id: state.nextId,
       name: state.newSubject.trim(),
       status: 'pending',
@@ -186,7 +131,7 @@ const handleAddSubject = (e: Event) => {
   }
 };
 
-const handleStartStudy = (id: number) => {
+const handleStartStudy = (id) => {
   if (state.activeTimerId) return;
 
   const chat = ai.chats.create({
@@ -213,14 +158,14 @@ const handleStartStudy = (id: number) => {
   });
 };
 
-const handleFinishStudy = (id: number) => {
+const handleFinishStudy = (id) => {
     if (state.activeTimerId) {
         clearInterval(state.activeTimerId);
     }
     const subject = state.subjects.find(s => s.id === id);
     if(!subject) return;
 
-    const finishedInfo: FinishedSubjectInfo = {
+    const finishedInfo = {
         id: subject.id,
         name: subject.name,
         timeString: formatTime(subject.elapsedTime),
@@ -238,7 +183,7 @@ const handleConfirmFinish = () => {
     const { id } = state.finishedSubjectInfo;
 
     const subjects = state.subjects.map(s =>
-        s.id === id ? { ...s, status: 'finished' as const } : s
+        s.id === id ? { ...s, status: 'finished' } : s
     );
 
     setState({
@@ -253,13 +198,13 @@ const handleConfirmFinish = () => {
 };
 
 
-const handlePhotoUpload = (id: number, file: File) => {
+const handlePhotoUpload = (id, file) => {
     const subject = state.subjects.find(s => s.id === id);
     if (!subject || !file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        const imgSrc = e.target?.result as string;
+        const imgSrc = e.target?.result;
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
@@ -301,7 +246,7 @@ const handlePhotoUpload = (id: number, file: File) => {
             const stampedImageSrc = canvas.toDataURL('image/jpeg');
             const points = Math.max(1, Math.floor(subject.elapsedTime / 60));
             
-            const newRecord: StudyRecord = {
+            const newRecord = {
                 id: state.nextRecordId,
                 subjectName: subject.name,
                 timeString,
@@ -323,54 +268,29 @@ const handlePhotoUpload = (id: number, file: File) => {
     reader.readAsDataURL(file);
 };
 
-const handleChatSubmit = async (e: Event) => {
+const handleChatSubmit = async (e) => {
     e.preventDefault();
     const prompt = state.chatInput.trim();
     if (!prompt || !state.chat || state.isAnswering) return;
 
-    const newHistory = [...state.chatHistory, { role: 'user' as const, text: prompt }];
+    const newHistory = [...state.chatHistory, { role: 'user', text: prompt }];
     setState({ chatInput: '', isAnswering: true, chatHistory: newHistory });
 
     try {
-        const response: GenerateContentResponse = await state.chat.sendMessage({ message: prompt });
+        const response = await state.chat.sendMessage({ message: prompt });
         const modelResponse = response.text;
-        const updatedHistory = [...newHistory, { role: 'model' as const, text: modelResponse }];
+        const updatedHistory = [...newHistory, { role: 'model', text: modelResponse }];
         setState({ chatHistory: updatedHistory, isAnswering: false });
     } catch (error) {
         console.error("Chat error:", error);
-        const errorHistory = [...newHistory, { role: 'model' as const, text: '죄송합니다. 오류가 발생했어요. 다시 시도해 주세요.' }];
+        const errorHistory = [...newHistory, { role: 'model', text: '죄송합니다. 오류가 발생했어요. 다시 시도해 주세요.' }];
         setState({ chatHistory: errorHistory, isAnswering: false });
     }
 };
 
 
 // --- RENDER FUNCTIONS ---
-const root = document.getElementById('root')!;
-
-const renderLoginPage = () => {
-    return `
-    <div class="login-container">
-        <div class="card login-card">
-            <header class="header">
-                <h1>나의 공부 플래너</h1>
-                <p>정보를 입력하여 시작하세요</p>
-            </header>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="name">이름</label>
-                    <input type="text" id="name" class="subject-input" required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="password">비밀번호</label>
-                    <input type="password" id="password" class="subject-input" autocomplete="current-password">
-                </div>
-                <button type="submit" class="btn btn-primary btn-full">시작하기</button>
-                <p id="error-message" class="error-text">${state.loginError}</p>
-            </form>
-        </div>
-    </div>
-    `;
-}
+const root = document.getElementById('root');
 
 const renderMainPage = () => {
     const isStudying = !!state.studyingSubjectId;
@@ -380,10 +300,10 @@ const renderMainPage = () => {
     return `
     <div class="app-container">
       <header class="header header-main">
-        <div class="logout-container">
-          <button class="btn btn-logout" data-action="logout">로그아웃</button>
+        <div class="reset-container">
+          <button class="btn btn-reset" data-action="reset">초기화</button>
         </div>
-        <h1>${state.userName}님의 공부 플래너</h1>
+        <h1>나의 공부 플래너</h1>
         <div class="header-stats">
             <div class="stat-item">
                 ${icons.star}
@@ -451,7 +371,7 @@ const renderMainPage = () => {
 
 const renderTimerPage = () => {
     const subject = state.subjects.find(s => s.id === state.studyingSubjectId);
-    if (!subject) return `<div class="error-page">Error: Subject not found.</div>`;
+    if (!subject) return `<div class="error-page">오류: 과목을 찾을 수 없습니다.</div>`;
 
     return `
     <div class="timer-page-container">
@@ -511,18 +431,16 @@ const renderFinishModal = () => {
 
 
 const render = () => {
+  // Save data on every render to persist state
+  saveData();
+
   const activeElement = document.activeElement;
   const activeElementId = activeElement?.id;
-  const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-  const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+  const selectionStart = activeElement?.selectionStart;
+  const selectionEnd = activeElement?.selectionEnd;
 
   let pageHtml = '';
   switch (state.currentPage) {
-      case 'login':
-          root.innerHTML = renderLoginPage();
-          document.getElementById('login-form')?.addEventListener('submit', handleLogin);
-          document.getElementById('name')?.focus();
-          return;
       case 'main':
           pageHtml = renderMainPage();
           break;
@@ -545,19 +463,19 @@ const render = () => {
   // --- ADD EVENT LISTENERS ---
   if (state.currentPage === 'main') {
     document.getElementById('add-subject-form')?.addEventListener('submit', handleAddSubject);
-    const subjectInput = document.getElementById('subject-input') as HTMLInputElement;
+    const subjectInput = document.getElementById('subject-input');
     if(subjectInput) {
         subjectInput.addEventListener('input', (e) => {
-            state.newSubject = (e.target as HTMLInputElement).value;
+            state.newSubject = e.target.value;
         });
     }
   } else if(state.currentPage === 'timer') {
     const chatForm = document.getElementById('chat-form');
     if (chatForm) {
         chatForm.addEventListener('submit', handleChatSubmit);
-        const chatInput = document.getElementById('chat-input') as HTMLInputElement;
+        const chatInput = document.getElementById('chat-input');
         chatInput?.addEventListener('input', (e) => {
-            state.chatInput = (e.target as HTMLInputElement).value;
+            state.chatInput = e.target.value;
         });
     }
     const chatHistoryEl = document.querySelector('.chat-history');
@@ -580,12 +498,12 @@ const render = () => {
             break;
         case 'upload':
             el.addEventListener('change', (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
+                const file = e.target.files?.[0];
                 if (file) handlePhotoUpload(id, file);
             });
             break;
-        case 'logout':
-            el.addEventListener('click', handleLogout);
+        case 'reset':
+            el.addEventListener('click', handleReset);
             break;
     }
   });
@@ -594,9 +512,9 @@ const render = () => {
   if (activeElementId) {
       const newActiveElement = document.getElementById(activeElementId);
       if (newActiveElement) {
-          (newActiveElement as HTMLElement).focus();
+          newActiveElement.focus();
           if (selectionStart !== null && selectionEnd !== null && newActiveElement.tagName === 'INPUT') {
-              (newActiveElement as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
+              newActiveElement.setSelectionRange(selectionStart, selectionEnd);
           }
       }
   }
@@ -604,18 +522,12 @@ const render = () => {
 
 const initializeApp = () => {
     try {
-        const savedUser = localStorage.getItem('studyPlannerUser');
-        if (savedUser) {
-            const user = JSON.parse(savedUser);
-            const savedData = localStorage.getItem(`plannerData_${user.name}`);
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                 setState({ ...state, ...parsedData, currentPage: 'main', userName: user.name });
-            } else {
-                 setState({ ...state, currentPage: 'main', userName: user.name });
-            }
+        const savedData = localStorage.getItem('plannerData');
+        if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            setState({ ...state, ...parsedData });
         } else {
-             setState({ ...state, currentPage: 'login' });
+             render();
         }
     } catch(e) {
         console.error("Failed to initialize app state:", e);
