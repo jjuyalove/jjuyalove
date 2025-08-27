@@ -3,23 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘도 공부 완료!</title>
-    <link rel="stylesheet" href="index.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-<script type="importmap">
-{
-  "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.14.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+    <title>픽셀 메이커</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: none; /* 모바일에서 터치 드래그 시 화면 스크롤 방지 */
+        }
+        .pixel-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            border: 2px solid #374151; /* gray-700 */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            background-image:
+                linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+                linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .pixel {
+            width: 100%;
+            padding-bottom: 100%; /* 1:1 비율 유지 */
+            background-color: transparent;
+            border: 1px solid #d1d5db; /* gray-300 */
+        }
+        .color-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+            border: 3px solid transparent;
+        }
+        .color-circle:hover {
+            transform: scale(1.1);
+        }
+        .color-circle.selected {
+            border-color: #3b82f6; /* blue-500 */
+            transform: scale(1.15);
+        }
+        /* 컬러 피커 스타일 */
+        input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 40px;
+            padding: 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+        input[type="color"]::-moz-color-swatch {
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+        }
+    </style>
 </head>
-<body>
-    <div id="root"></div>
-    <script type="module" src="index.js"></script>
-<script type="module" src="/index.tsx"></script>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">🎨 픽셀 메이커</h1>
+            <p class="text-gray-500 mt-2">나만의 픽셀 아트를 만들어보세요!</p>
+        </header>
+
+        <main class="flex flex-col md:flex-row gap-8 items-start justify-center">
+            <!-- Left Panel: Palette & Controls -->
+            <div class="w-full md:w-auto flex flex-col items-center gap-6">
+                <!-- 색상 컨트롤 박스 -->
+                <div class="bg-gray-100 p-4 rounded-lg w-full">
+                    <div id="color-palette" class="grid grid-cols-3 gap-3 mb-4">
+                        <!-- 색상 팔레트가 여기에 동적으로 추가됩니다. -->
+                    </div>
+                    <div class="border-t border-gray-300 pt-4">
+                        <label for="custom-color-picker" class="text-sm font-medium text-gray-700 text-center block mb-2">직접 색상 선택</label>
+                        <input type="color" id="custom-color-picker" value="#000000">
+                    </div>
+                </div>
+
+                <div class="w-full space-y-3">
+                    <button id="clear-btn" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors">
+                        모두 지우기
+                    </button>
+                    <button id="download-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-colors">
+                        PNG로 다운로드
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Pixel Grid -->
+            <div class="w-full max-w-md mx-auto">
+                <div id="pixel-grid" class="pixel-grid aspect-square">
+                    <!-- 10x10 픽셀이 여기에 동적으로 추가됩니다. -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PNG 생성을 위한 숨겨진 캔버스 -->
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const GRID_SIZE = 10;
+            const grid = document.getElementById('pixel-grid');
+            const paletteContainer = document.getElementById('color-palette');
+            const customColorPicker = document.getElementById('custom-color-picker');
+            const clearBtn = document.getElementById('clear-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const hiddenCanvas = document.getElementById('hidden-canvas');
+            const ctx = hiddenCanvas.getContext('2d');
+
+            const colors = [
+                '#FF0000', '#FFA500', '#FFFF00', '#008000', '#0000FF', 
+                '#00008B', '#800080', '#FFFFFF', '#000000', 'transparent'
+            ];
+
+            let selectedColor = '#000000';
+            let isDrawing = false;
+
+            // 1. 팔레트 생성
+            colors.forEach(color => {
+                const colorCircle = document.createElement('div');
+                colorCircle.classList.add('color-circle');
+                if (color === 'transparent') {
+                    colorCircle.style.backgroundImage = `
+                        linear-gradient(45deg, #ccc 25%, transparent 25%),
+                        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #ccc 75%),
+                        linear-gradient(-45deg, transparent 75%, #ccc 75%)`;
+                    colorCircle.style.backgroundSize = '10px 10px';
+                    colorCircle.style.backgroundPosition = '0 0, 0 5px, 5px -5px, -5px 0px';
+                    colorCircle.style.backgroundColor = 'white';
+                } else {
+                    colorCircle.style.backgroundColor = color;
+                }
+                
+                colorCircle.dataset.color = color;
+                if (color === selectedColor) {
+                    colorCircle.classList.add('selected');
+                }
+
+                colorCircle.addEventListener('click', () => {
+                    selectedColor = color;
+                    document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+                    colorCircle.classList.add('selected');
+                });
+                paletteContainer.appendChild(colorCircle);
+            });
+
+            // 직접 색상 선택 기능
+            customColorPicker.addEventListener('input', (e) => {
+                selectedColor = e.target.value;
+                // 직접 색상을 고르면 기존 팔레트의 선택 표시는 해제
+                document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+            });
+
+            // 2. 픽셀 그리드 생성
+            for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                const pixel = document.createElement('div');
+                pixel.classList.add('pixel');
+                
+                const paintPixel = (e) => {
+                    e.preventDefault();
+                    if (e.buttons === 1 || e.type === 'mousedown' || e.type === 'touchstart' || e.type === 'touchmove') {
+                        pixel.style.backgroundColor = selectedColor;
+                    }
+                };
+                
+                pixel.addEventListener('mousedown', (e) => {
+                    isDrawing = true;
+                    paintPixel(e);
+                });
+                pixel.addEventListener('mouseover', paintPixel);
+                
+                pixel.addEventListener('touchstart', (e) => {
+                    isDrawing = true;
+                    paintPixel(e);
+                });
+                pixel.addEventListener('touchmove', (e) => {
+                    const touch = e.touches[0];
+                    const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (targetElement && targetElement.classList.contains('pixel')) {
+                        targetElement.style.backgroundColor = selectedColor;
+                    }
+                });
+
+                grid.appendChild(pixel);
+            }
+            
+            document.body.addEventListener('mouseup', () => { isDrawing = false; });
+            document.body.addEventListener('touchend', () => { isDrawing = false; });
+
+            // 3. 모두 지우기 기능
+            clearBtn.addEventListener('click', () => {
+                document.querySelectorAll('.pixel').forEach(pixel => {
+                    pixel.style.backgroundColor = 'transparent';
+                });
+            });
+
+            // 4. PNG 다운로드 기능
+            downloadBtn.addEventListener('click', () => {
+                const PIXEL_SCALE = 50;
+                hiddenCanvas.width = GRID_SIZE * PIXEL_SCALE;
+                hiddenCanvas.height = GRID_SIZE * PIXEL_SCALE;
+                
+                ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+                const pixels = document.querySelectorAll('.pixel');
+                pixels.forEach((pixel, index) => {
+                    const row = Math.floor(index / GRID_SIZE);
+                    const col = index % GRID_SIZE;
+                    const color = pixel.style.backgroundColor;
+
+                    if (color && color !== 'transparent') {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(col * PIXEL_SCALE, row * PIXEL_SCALE, PIXEL_SCALE, PIXEL_SCALE);
+                    }
+                });
+
+                const link = document.createElement('a');
+                link.download = 'my-pixel-art.png';
+                link.href = hiddenCanvas.toDataURL('image/png');
+                link.click();
+            });
+        });
+    </script>
+
 </body>
 </html>
