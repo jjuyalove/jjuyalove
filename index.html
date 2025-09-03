@@ -13,8 +13,8 @@
         }
         .pixel-grid {
             display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            grid-template-rows: repeat(10, 1fr);
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
             border: 2px solid #374151; /* gray-700 */
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             background-image:
@@ -70,7 +70,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 md:p-8">
+    <div class="w-full max-w-4xl bg-white rounded-xl shadow-lg p-6 md:p-8">
         <header class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800">🎨 픽셀 메이커</h1>
             <p class="text-gray-500 mt-2">나만의 픽셀 아트를 만들어보세요!</p>
@@ -101,7 +101,7 @@
             </div>
 
             <!-- Right Panel: Pixel Grid -->
-            <div class="w-full max-w-md mx-auto">
+            <div class="w-full max-w-lg mx-auto">
                 <div id="pixel-grid" class="pixel-grid aspect-square">
                     <!-- 10x10 픽셀이 여기에 동적으로 추가됩니다. -->
                 </div>
@@ -114,7 +114,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const GRID_SIZE = 10;
+            const GRID_SIZE = 15;
             const grid = document.getElementById('pixel-grid');
             const paletteContainer = document.getElementById('color-palette');
             const customColorPicker = document.getElementById('custom-color-picker');
@@ -241,3 +241,5 @@
 
 </body>
 </html>
+
+
